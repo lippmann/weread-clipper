@@ -180,25 +180,6 @@ async function uploadToWeread(article) {
   return { success: true };
 }
 
-// ── 下载 EPUB（备用方案）────────────────────────────────
-async function downloadEpub(article) {
-  const images = decodeImageData(article.imageData);
-  const epubData = generateEpub(article, images);
-  const safeName = (article.title || '未命名文章')
-    .replace(/[\\/:*?"<>|]/g, '_')
-    .slice(0, 80);
-
-  const blob = new Blob([epubData], { type: 'application/epub+zip' });
-  const url = URL.createObjectURL(blob);
-  const downloadId = await chrome.downloads.download({
-    url,
-    filename: `${safeName}.epub`,
-    saveAs: false,
-  });
-  setTimeout(() => URL.revokeObjectURL(url), 60000);
-  return { success: true, downloadId };
-}
-
 // ── 消息监听 ──────────────────────────────────────────────
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'checkLogin') {
@@ -209,12 +190,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     uploadToWeread(message.article)
       .then(sendResponse)
       .catch(e => sendResponse({ success: false, errorCode: 'UPLOAD_FAILED', message: e.message }));
-    return true;
-  }
-  if (message.action === 'downloadEpub') {
-    downloadEpub(message.article)
-      .then(sendResponse)
-      .catch(e => sendResponse({ success: false, errorCode: 'DOWNLOAD_FAILED', message: e.message }));
     return true;
   }
 });
