@@ -248,15 +248,100 @@
       if (alt) img.setAttribute('alt', alt);
     });
 
+    // 二次过滤：只保留真正的正文块，去掉推荐、版权、作者简介等杂项
+    const cleaned = extractMeaningfulBlocks(clone);
+
     // 将 <br> 转为换行符（仅用于纯文本提取）
-    const cloneForText = clone.cloneNode(true);
+    const cloneForText = cleaned.cloneNode(true);
     cloneForText.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
 
     return {
-      htmlContent: clone.innerHTML,
+      htmlContent: cleaned.innerHTML,
       text: extractText(cloneForText),
       imageUrls: [...new Set(imageUrls)],
     };
+  }
+
+  /**
+   * 从已清理的容器中提取有意义的正文块，过滤掉导航、推荐、版权等噪音。
+   *
+   * 策略：
+   * - 直接保留语义内容标签（p / h1-h6 / blockquote / figure）
+   * - 图片直接保留
+   * - 列表：仅保留条目平均长度 > 15 字的（排除导航菜单）
+   * - div/section：无块级子节点且文本量 > 40 字时视为段落；否则递归
+   * - 链接密度 > 65% 的节点跳过（导航、相关阅读等）
+   */
+  function extractMeaningfulBlocks(el) {
+    const out = document.createElement('div');
+    const CONTENT = new Set(['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'figure', 'figcaption']);
+    const LISTS   = new Set(['ul', 'ol']);
+    const BLOCK   = new Set(['div', 'section', 'article', 'main', 'td', 'dd']);
+
+    function linkDensity(node) {
+      const total = (node.textContent || '').trim().length;
+      if (!total) return 0;
+      const linked = Array.from(node.querySelectorAll('a'))
+        .reduce((s, a) => s + (a.textContent || '').length, 0);
+      return linked / total;
+    }
+
+    function visit(node) {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = node.tagName.toLowerCase();
+      const text = (node.textContent || '').trim();
+
+      // 高链接密度（导航 / 相关推荐）且无图片 → 跳过
+      if (linkDensity(node) > 0.65 && !node.querySelector('img')) return;
+
+      // 直接内容标签
+      if (CONTENT.has(tag)) {
+        if (text.length > 10 || node.querySelector('img')) {
+          out.appendChild(node.cloneNode(true));
+        }
+        return;
+      }
+
+      // 图片
+      if (tag === 'img') {
+        out.appendChild(node.cloneNode(true));
+        return;
+      }
+
+      // 列表：过滤掉项目过多或平均文字太少的（导航菜单特征）
+      if (LISTS.has(tag)) {
+        const items = node.querySelectorAll('li');
+        const avgLen = items.length ? text.length / items.length : 0;
+        if (items.length >= 1 && items.length <= 25 && avgLen > 15) {
+          out.appendChild(node.cloneNode(true));
+        }
+        return;
+      }
+
+      // 块级容器：判断是否是"叶子段落"还是需要递归
+      if (BLOCK.has(tag)) {
+        const hasBlockKids = [...node.children].some(c => {
+          const t = c.tagName.toLowerCase();
+          return CONTENT.has(t) || LISTS.has(t) || BLOCK.has(t);
+        });
+        // 没有块级子节点、文字够多 → 当作段落处理
+        if (!hasBlockKids && text.length > 40) {
+          const p = document.createElement('p');
+          p.innerHTML = node.innerHTML;
+          out.appendChild(p);
+          return;
+        }
+        // 有块级子节点 → 递归
+        for (const child of node.childNodes) visit(child);
+        return;
+      }
+
+      // 其他标签递归
+      for (const child of node.childNodes) visit(child);
+    }
+
+    for (const child of el.childNodes) visit(child);
+    return out;
   }
 
   /**
