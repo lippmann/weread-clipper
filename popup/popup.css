@@ -1,0 +1,236 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  width: 320px;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  min-height: 120px;
+}
+
+/* ── 顶部栏 ── */
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  background: #fafafa;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  color: #1a1a1a;
+}
+
+.login-link {
+  font-size: 12px;
+  color: #3D9BF0;
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid #3D9BF0;
+  border-radius: 10px;
+  transition: all 0.15s;
+}
+.login-link:hover {
+  background: #3D9BF0;
+  color: #fff;
+}
+.login-link.logged-in {
+  color: #999;
+  border-color: #ddd;
+}
+.login-link.logged-in:hover {
+  background: #f5f5f5;
+  color: #666;
+}
+
+/* ── 登录提示 ── */
+.login-warning {
+  padding: 12px 16px;
+  background: #fff7e6;
+  border-bottom: 1px solid #ffd591;
+  font-size: 13px;
+  color: #874d00;
+  line-height: 1.6;
+}
+.login-warning a {
+  color: #d46b08;
+  font-weight: 500;
+}
+
+/* ── 状态区 ── */
+main {
+  padding: 16px;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+/* ── Spinner ── */
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #e0e0e0;
+  border-top-color: #3D9BF0;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  margin: 8px 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── 文章信息 ── */
+.article-info {
+  width: 100%;
+  text-align: left;
+  margin-bottom: 12px;
+}
+
+.title-input {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1a1a1a;
+  border: 1px solid #e8e8e8;
+  border-radius: 6px;
+  padding: 7px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  font-family: inherit;
+}
+.title-input:focus {
+  border-color: #3D9BF0;
+  box-shadow: 0 0 0 2px rgba(61, 155, 240, 0.15);
+}
+
+.article-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: #888;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.word-count {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #aaa;
+}
+
+/* ── 按钮 ── */
+.actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  font-weight: 500;
+}
+
+.btn-primary {
+  background: #3D9BF0;
+  color: #fff;
+}
+.btn-primary:hover { background: #2d8de0; }
+.btn-primary:active { background: #1d7ecf; }
+.btn-primary:disabled {
+  background: #a8d4f8;
+  cursor: not-allowed;
+}
+
+.btn-secondary {
+  background: #f5f5f5;
+  color: #444;
+}
+.btn-secondary:hover { background: #ebebeb; }
+.btn-secondary:active { background: #e0e0e0; }
+
+.btn-text {
+  background: none;
+  color: #3D9BF0;
+  width: auto;
+  padding: 6px 0;
+}
+.btn-text:hover { text-decoration: underline; }
+
+/* ── 成功状态 ── */
+.success-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #3D9BF0;
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+/* ── 错误状态 ── */
+.error-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ff4d4f;
+  color: #fff;
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.error-detail {
+  font-size: 12px;
+  color: #999;
+  max-width: 260px;
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+/* ── 提示文字 ── */
+.hint {
+  font-size: 12px;
+  color: #aaa;
+  line-height: 1.6;
+}
+.hint a {
+  color: #3D9BF0;
+  text-decoration: none;
+}
+.hint a:hover { text-decoration: underline; }

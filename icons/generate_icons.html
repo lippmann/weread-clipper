@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+<head><title>生成图标</title></head>
+<body>
+<canvas id="c128" width="128" height="128"></canvas>
+<canvas id="c48" width="48" height="48"></canvas>
+<canvas id="c16" width="16" height="16"></canvas>
+<script>
+function drawIcon(canvas) {
+  const ctx = canvas.getContext('2d');
+  const s = canvas.width;
+  const r = s * 0.15;
+
+  // 背景
+  ctx.fillStyle = '#07C160';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, s, s, r);
+  ctx.fill();
+
+  // 书本图案（白色）
+  ctx.fillStyle = '#ffffff';
+  const m = s * 0.18;
+  const bw = s - m * 2;
+  const bh = s * 0.55;
+  const by = s * 0.25;
+
+  // 书本外框
+  ctx.fillRect(m, by, bw, bh);
+
+  // 书脊线
+  ctx.fillStyle = '#07C160';
+  const spw = s * 0.06;
+  ctx.fillRect(m + bw / 2 - spw / 2, by, spw, bh);
+
+  // 翻页箭头（底部）
+  ctx.fillStyle = '#ffffff';
+  const ax = s / 2;
+  const ay = by + bh + s * 0.06;
+  const aw = s * 0.22;
+  const ah = s * 0.1;
+  ctx.beginPath();
+  ctx.moveTo(ax - aw, ay);
+  ctx.lineTo(ax + aw, ay);
+  ctx.lineTo(ax, ay + ah);
+  ctx.fill();
+}
+
+['c128','c48','c16'].forEach(id => {
+  const c = document.getElementById(id);
+  drawIcon(c);
+  const a = document.createElement('a');
+  a.download = 'icon' + c.width + '.png';
+  a.href = c.toDataURL();
+  a.textContent = '下载 ' + c.width + 'x' + c.width;
+  document.body.appendChild(a);
+  document.body.appendChild(document.createElement('br'));
+});
+</script>
+</body>
+</html>

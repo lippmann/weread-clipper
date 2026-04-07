@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "微信读书剪藏",
+  "version": "1.0.0",
+  "description": "一键将网页文章发送到微信读书",
+  "permissions": [
+    "activeTab",
+    "tabs",
+    "scripting",
+    "cookies",
+    "storage",
+    "downloads"
+  ],
+  "host_permissions": [
+    "https://weread.qq.com/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service_worker.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

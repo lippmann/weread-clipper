@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>微信读书剪藏</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- 顶部栏 -->
+    <header>
+      <div class="logo">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z" fill="#3D9BF0"/>
+        </svg>
+        <span>微信读书剪藏</span>
+      </div>
+      <a class="login-link" id="loginLink" href="https://weread.qq.com" target="_blank" title="前往登录">未登录</a>
+    </header>
+
+    <!-- 登录提示 -->
+    <div class="login-warning" id="loginWarning" style="display:none">
+      <p>请先<a href="https://weread.qq.com" target="_blank">登录微信读书网页版</a>，然后重新打开此插件。</p>
+    </div>
+
+    <!-- 主内容区 -->
+    <main id="mainContent">
+      <!-- 状态：正在提取 -->
+      <div class="state" id="stateExtracting">
+        <div class="spinner"></div>
+        <p>正在提取文章内容…</p>
+      </div>
+
+      <!-- 状态：提取完成，等待操作 -->
+      <div class="state" id="stateReady" style="display:none">
+        <div class="article-info">
+          <input type="text" id="articleTitle" class="title-input" placeholder="文章标题" />
+          <div class="article-meta" id="articleMeta"></div>
+          <div class="word-count" id="wordCount"></div>
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="btnSend">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+            发送到微信读书
+          </button>
+          <button class="btn btn-secondary" id="btnDownload">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            下载 EPUB
+          </button>
+        </div>
+      </div>
+
+      <!-- 状态：正在上传 -->
+      <div class="state" id="stateUploading" style="display:none">
+        <div class="spinner"></div>
+        <p id="uploadingText">正在上传到微信读书…</p>
+      </div>
+
+      <!-- 状态：成功 -->
+      <div class="state" id="stateSuccess" style="display:none">
+        <div class="success-icon">✓</div>
+        <p id="successText">已发送到微信读书！</p>
+        <p class="hint">微信读书上传页已打开，请等待上传完成后在书架查看。</p>
+        <button class="btn btn-secondary" id="btnReset" style="margin-top:12px">返回</button>
+      </div>
+
+      <!-- 状态：错误 -->
+      <div class="state" id="stateError" style="display:none">
+        <div class="error-icon">✗</div>
+        <p id="errorTitle">上传失败</p>
+        <p class="error-detail" id="errorDetail"></p>
+        <div class="actions" style="margin-top:12px">
+          <button class="btn btn-secondary" id="btnDownloadFallback">下载 EPUB 手动上传</button>
+          <button class="btn btn-text" id="btnRetry">重试</button>
+        </div>
+      </div>
+
+      <!-- 状态：提取失败 -->
+      <div class="state" id="stateExtractError" style="display:none">
+        <div class="error-icon">✗</div>
+        <p>无法提取此页面的文章内容</p>
+        <p class="hint">当前页面可能不支持自动提取，请尝试其他文章页面。</p>
+      </div>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
