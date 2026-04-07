@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "微信读书剪藏",
+  "name": "剪阅：一键上传微信读书",
   "version": "1.0.0",
   "description": "一键将网页文章发送到微信读书",
   "permissions": [
