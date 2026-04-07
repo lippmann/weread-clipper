@@ -167,13 +167,13 @@ function handleUploadError(result, article) {
 }
 
 // ── 下载 EPUB ─────────────────────────────────────────────
-async function downloadEpub() {
+async function downloadEpub(e) {
   if (!currentArticle) return;
   const article = {
     ...currentArticle,
     title: articleTitle.value.trim() || currentArticle.title,
   };
-  const btn = event.currentTarget;
+  const btn = e.currentTarget;
   btn.disabled = true;
   btn.textContent = '生成中…';
   const result = await chrome.runtime.sendMessage({ action: 'downloadEpub', article });

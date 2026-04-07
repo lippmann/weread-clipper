@@ -206,11 +206,15 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
   if (message.action === 'uploadToWeread') {
-    uploadToWeread(message.article).then(sendResponse);
+    uploadToWeread(message.article)
+      .then(sendResponse)
+      .catch(e => sendResponse({ success: false, errorCode: 'UPLOAD_FAILED', message: e.message }));
     return true;
   }
   if (message.action === 'downloadEpub') {
-    downloadEpub(message.article).then(sendResponse);
+    downloadEpub(message.article)
+      .then(sendResponse)
+      .catch(e => sendResponse({ success: false, errorCode: 'DOWNLOAD_FAILED', message: e.message }));
     return true;
   }
 });
