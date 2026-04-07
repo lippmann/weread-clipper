@@ -21,9 +21,7 @@ const errorTitle     = document.getElementById('errorTitle');
 const errorDetail    = document.getElementById('errorDetail');
 
 const btnSend             = document.getElementById('btnSend');
-const btnDownload         = document.getElementById('btnDownload');
 const btnReset            = document.getElementById('btnReset');
-const btnDownloadFallback = document.getElementById('btnDownloadFallback');
 const btnRetry            = document.getElementById('btnRetry');
 
 // 当前提取到的文章数据
@@ -166,39 +164,6 @@ function handleUploadError(result, article) {
   showState(stateError);
 }
 
-// ── 下载 EPUB ─────────────────────────────────────────────
-async function downloadEpub(e) {
-  if (!currentArticle) return;
-  const article = {
-    ...currentArticle,
-    title: articleTitle.value.trim() || currentArticle.title,
-  };
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  btn.textContent = '生成中…';
-  const result = await chrome.runtime.sendMessage({ action: 'downloadEpub', article });
-  btn.disabled = false;
-  btn.innerHTML = btn === btnDownload
-    ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg> 下载 EPUB'
-    : '下载 EPUB 手动上传';
-  if (result.success) {
-    showDownloadHint();
-  }
-}
-
-btnDownload.addEventListener('click', downloadEpub);
-btnDownloadFallback.addEventListener('click', downloadEpub);
-
-function showDownloadHint() {
-  const hint = document.createElement('p');
-  hint.className = 'hint';
-  hint.style.marginTop = '8px';
-  hint.innerHTML = 'EPUB 已下载，请前往 <a href="https://weread.qq.com" target="_blank">微信读书书架</a> 上传。';
-  const actions = document.querySelector('#stateReady .actions') || document.querySelector('#stateError .actions');
-  if (actions && !actions.querySelector('.hint')) {
-    actions.appendChild(hint);
-  }
-}
 
 // ── 重置 ──────────────────────────────────────────────────
 btnReset.addEventListener('click', () => {
