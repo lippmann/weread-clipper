@@ -106,7 +106,8 @@ function renderReady(article) {
   articleMeta.textContent = metaParts.join(' · ');
 
   const chars = article.content.replace(/\s/g, '').length;
-  wordCount.textContent = `约 ${formatCount(chars)} 字`;
+  const pageLabel = article.pageCount > 1 ? `，共 ${article.pageCount} 页` : '';
+  wordCount.textContent = `约 ${formatCount(chars)} 字${pageLabel}`;
 
   // 没有登录时禁用发送按钮
   if (!isLoggedIn) {

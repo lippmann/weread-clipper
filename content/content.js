@@ -73,6 +73,7 @@
 
   /**
    * 评估一个元素的"文章内容"得分
+   * 使用 textContent 而非 innerText，兼容 DOMParser 创建的离线文档
    */
   function scoreElement(el) {
     if (!el || el.nodeType !== Node.ELEMENT_NODE) return 0;
@@ -101,10 +102,10 @@
     const cnPatterns = /artical|artBody|artContent|newstext|article_content|detail_content|post_body|TRS_Editor/i;
     if (cnPatterns.test(id) || cnPatterns.test(cls)) score += 30;
 
-    // 根据文本密度打分
-    const text = el.innerText || '';
+    // 根据文本密度打分（textContent 在离线文档中同样可用）
+    const text = el.textContent || '';
     const textLength = text.trim().length;
-    const linkText = Array.from(el.querySelectorAll('a')).reduce((s, a) => s + (a.innerText || '').length, 0);
+    const linkText = Array.from(el.querySelectorAll('a')).reduce((s, a) => s + (a.textContent || '').length, 0);
     const linkDensity = textLength > 0 ? linkText / textLength : 1;
 
     if (textLength > 500) score += 20;
@@ -122,8 +123,9 @@
 
   /**
    * 主要内容提取
+   * @param {Document} doc - 目标文档，默认为当前页面的 document
    */
-  function extractContent() {
+  function extractContent(doc = document) {
     // 策略 1: 常用选择器（优先精确匹配）
     const directSelectors = [
       // 标准语义标签
@@ -151,7 +153,7 @@
     let bestScore = 0;
 
     for (const selector of directSelectors) {
-      const el = document.querySelector(selector);
+      const el = doc.querySelector(selector);
       if (el) {
         const score = scoreElement(el);
         if (score > bestScore) {
@@ -164,7 +166,7 @@
 
     // 策略 2: 遍历 div/section/article 找最高分
     if (!best || bestScore < 30) {
-      const candidates = document.querySelectorAll('div, section, article');
+      const candidates = doc.querySelectorAll('div, section, article');
       for (const el of candidates) {
         // 跳过嵌套太深的元素（可能是子容器）
         if (el.querySelectorAll('div, section, article').length > 20) continue;
@@ -177,16 +179,18 @@
     }
 
     // 策略 3: 实在找不到就用 body
-    if (!best) best = document.body;
+    if (!best) best = doc.body;
 
-    return cleanContent(best);
+    return cleanContent(best, doc === document ? window.location.href : '');
   }
 
   /**
    * 清理提取到的内容，移除噪音节点
    * 返回 { text, htmlContent, imageUrls }
+   * @param {Element} el - 要清理的元素
+   * @param {string} baseUrl - 用于解析相对 URL（对 DOMParser 文档尤其重要）
    */
-  function cleanContent(el) {
+  function cleanContent(el, baseUrl = window.location.href) {
     const clone = el.cloneNode(true);
 
     // 移除脚本、样式、广告等噪音
@@ -222,17 +226,26 @@
         // data-src 存在且是绝对 URL → 直接用，不管 src 是什么
         src = lazySrc;
       } else {
+        // 优先尝试 img.src（活跃文档中已是绝对 URL）
+        // 对 DOMParser 文档兜底：用 getAttribute('src') + baseUrl 解析
         src = img.src || '';
+        if (!src.startsWith('http')) {
+          const attrSrc = img.getAttribute('src') || '';
+          if (attrSrc) {
+            try { src = new URL(attrSrc, baseUrl).href; } catch { src = ''; }
+          }
+        }
+
         // 过滤掉明显的占位符
         if (
           !src.startsWith('http') ||
           src.startsWith('data:') ||
-          src === window.location.href ||
+          src === baseUrl ||
           (img.naturalWidth > 0 && img.naturalWidth <= 2 && img.naturalHeight <= 2)
         ) {
           // 尝试用 lazySrc 补救
           if (lazySrc) {
-            try { src = new URL(lazySrc, window.location.href).href; } catch { src = lazySrc; }
+            try { src = new URL(lazySrc, baseUrl).href; } catch { src = lazySrc; }
           } else {
             img.remove();
             return;
@@ -389,6 +402,136 @@
   }
 
   /**
+   * 检测文档中是否有"下一页"链接
+   * 支持 <link rel="next">、<a rel="next">，以及含分页参数的"次へ"等文字链接
+   * @param {Document} doc
+   * @param {string} baseUrl - 用于解析相对 href
+   * @returns {string|null} 下一页的绝对 URL，或 null
+   */
+  function detectNextPageUrl(doc, baseUrl) {
+    function resolve(href) {
+      if (!href || href === '#') return null;
+      if (href.startsWith('http')) return href;
+      try { return new URL(href, baseUrl).href; } catch { return null; }
+    }
+
+    // 1. <link rel="next"> —— 最可靠（Yahoo News、Bloomberg 等使用）
+    const linkNext = doc.querySelector('link[rel="next"]');
+    if (linkNext) {
+      const url = resolve(linkNext.getAttribute('href'));
+      if (url) return url;
+    }
+
+    // 2. <a rel="next">
+    const aNext = doc.querySelector('a[rel="next"]');
+    if (aNext) {
+      const url = resolve(aNext.getAttribute('href'));
+      if (url) return url;
+    }
+
+    // 3. 文字匹配 + URL 含分页参数
+    //    只认定含明确分页参数的链接（避免把"下一篇文章"误识别为翻页）
+    const nextTexts = ['次のページ', '次へ', '次ページ', 'Next', '下一页', '下一頁'];
+    const pagePattern = /[?&]p(?:age)?=\d+|\/page\/\d+/i;
+
+    for (const a of doc.querySelectorAll('a[href]')) {
+      const text = (a.textContent || '').trim().replace(/[\s\u3000]+/g, '');
+      if (!nextTexts.some(t => text === t || text.startsWith(t))) continue;
+
+      const url = resolve(a.getAttribute('href'));
+      if (!url) continue;
+
+      if (pagePattern.test(url)) return url;
+
+      // 兜底：和当前页同域同路径，仅 query 不同（如 Yahoo Japan 的 ?page=N）
+      try {
+        const base = new URL(baseUrl);
+        const next = new URL(url);
+        if (base.hostname === next.hostname && base.pathname === next.pathname && url !== baseUrl) {
+          return url;
+        }
+      } catch {}
+    }
+
+    return null;
+  }
+
+  /**
+   * 抓取指定 URL 的页面并提取正文内容
+   * 使用 DOMParser 在页面上下文内解析，自动携带 Cookie（支持登录墙）
+   * @param {string} url
+   * @returns {{ htmlContent, text, imageUrls, nextUrl }|null}
+   */
+  async function fetchAndExtractPage(url) {
+    let resp;
+    try {
+      resp = await fetch(url, { credentials: 'include' });
+    } catch {
+      return null;
+    }
+    if (!resp.ok) return null;
+
+    const html = await resp.text();
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+
+    // 设置 <base> 确保 img.src 等相对 URL 能正确解析
+    let base = doc.querySelector('base');
+    if (base) {
+      const existing = base.getAttribute('href') || '';
+      if (!existing.startsWith('http')) base.setAttribute('href', url);
+    } else {
+      base = doc.createElement('base');
+      base.setAttribute('href', url);
+      doc.head.insertBefore(base, doc.head.firstChild);
+    }
+
+    const extracted = extractContent(doc);
+    const nextUrl = detectNextPageUrl(doc, url);
+    return { ...extracted, nextUrl };
+  }
+
+  /**
+   * 收集当前文章所有分页的内容
+   * 如果无分页则直接返回单页内容；否则依次抓取后续各页并合并
+   */
+  async function collectAllPages() {
+    const meta = extractMeta();
+    const page1 = extractContent();
+    const nextUrl1 = detectNextPageUrl(document, window.location.href);
+
+    if (!nextUrl1) {
+      return { meta, extracted: page1, pageCount: 1 };
+    }
+
+    // 有分页：依次抓取所有后续页（最多 10 页防止死循环）
+    const pages = [page1];
+    let nextUrl = nextUrl1;
+    const MAX_PAGES = 10;
+
+    while (nextUrl && pages.length < MAX_PAGES) {
+      const page = await fetchAndExtractPage(nextUrl);
+      if (!page) break;
+      pages.push(page);
+      nextUrl = page.nextUrl;
+    }
+
+    // 合并内容：多页时用 <hr> 分隔
+    const allHtml = pages.length === 1
+      ? pages[0].htmlContent
+      : pages.map((p, i) => `<div data-page="${i + 1}">${p.htmlContent}</div>`).join('\n<hr/>\n');
+
+    const allText = pages.map(p => p.text).join('\n\n');
+    const allImageUrls = [...new Set(pages.flatMap(p => p.imageUrls))];
+
+    return {
+      meta,
+      extracted: { text: allText, htmlContent: allHtml, imageUrls: allImageUrls },
+      pageCount: pages.length,
+    };
+  }
+
+  /**
    * 在页面上下文中抓取图片并转为 base64
    * 在 content script 里执行，请求自动携带当前页面的 Referer，
    * 可绕过 BBC、网易等 CDN 的防盗链限制。
@@ -439,11 +582,10 @@
   // 监听来自 popup 的消息
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'extractArticle') {
-      // 异步：先提取内容，再在页面上下文里抓图
+      // 异步：收集所有分页内容，再在页面上下文里抓图
       (async () => {
         try {
-          const meta = extractMeta();
-          const extracted = extractContent();
+          const { meta, extracted, pageCount } = await collectAllPages();
           const imageData = await fetchImagesInPage(extracted.imageUrls);
           sendResponse({
             success: true,
@@ -456,7 +598,8 @@
               content: extracted.text,
               htmlContent: extracted.htmlContent,
               imageUrls: extracted.imageUrls,
-              imageData, // 已在页面上下文预取的图片数据
+              imageData,
+              pageCount,
             },
           });
         } catch (e) {
