@@ -7,9 +7,7 @@
     "activeTab",
     "tabs",
     "scripting",
-    "cookies",
-    "storage",
-    "downloads"
+    "cookies"
   ],
   "host_permissions": [
     "https://weread.qq.com/*",
