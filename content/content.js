@@ -401,6 +401,154 @@
       .trim();
   }
 
+  // ── 站点专属提取器 ──────────────────────────────────────
+
+  /**
+   * 维基百科专属提取器
+   * 直接选取 .mw-parser-output 下的语义块，跳过链接密度过滤
+   * （维基正文段落含大量词条链接，通用规则会误判为导航噪音）
+   */
+  function extractWikipedia(doc = document, baseUrl = window.location.href) {
+    const container = doc.querySelector('.mw-parser-output') ||
+                      doc.querySelector('#mw-content-text');
+    if (!container) return extractContent(doc);
+
+    const clone = container.cloneNode(true);
+
+    // 移除维基百科特有噪音：目录、导航框、引用列表、编辑按钮等
+    [
+      '#toc', '.toc', '.navbox', '[class*="navbox"]',
+      '.mw-editsection', '.reflist', '.references',
+      '.hatnote', '.sidebar', '[role="navigation"]',
+      '.mw-empty-elt', '.metadata', 'sup.reference',
+      'table',  // 移除信息框（infobox）和 wikitable，在 EPUB 中排版复杂
+    ].forEach(sel => clone.querySelectorAll(sel).forEach(n => n.remove()));
+
+    const out = document.createElement('div');
+    const imageUrls = [];
+
+    // 直接收集段落、标题、引用、图片块——不经过链接密度过滤
+    clone.querySelectorAll('p, h2, h3, h4, h5, h6, blockquote, figure, div.thumb').forEach(el => {
+      const text = el.textContent.trim();
+      if (!text && !el.querySelector('img')) return;
+      if (text.length < 5 && !el.querySelector('img')) return;
+
+      // 收集图片 URL（处理 // 协议相对路径）
+      el.querySelectorAll('img').forEach(img => {
+        const raw = img.getAttribute('data-src') || img.getAttribute('src') || '';
+        let src = raw;
+        if (src.startsWith('//')) src = 'https:' + src;
+        else if (src && !src.startsWith('http')) {
+          try { src = new URL(src, baseUrl).href; } catch { src = ''; }
+        }
+        if (src) imageUrls.push(src);
+      });
+
+      out.appendChild(el.cloneNode(true));
+    });
+
+    if (out.textContent.trim().length < 50) return extractContent(doc);
+
+    const cloneForText = out.cloneNode(true);
+    cloneForText.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+
+    return {
+      htmlContent: out.innerHTML,
+      text: extractText(cloneForText),
+      imageUrls: [...new Set(imageUrls)],
+    };
+  }
+
+  /**
+   * 百度百科专属提取器
+   * 百度百科正文用嵌套 div + span 而非 <p>，通用递归逻辑无法提取叶子文本
+   * 此处直接定位 .J-lemma-content，逐层找"叶子块"转为段落
+   */
+  function extractBaiduBaike(doc = document, baseUrl = window.location.href) {
+    const container = doc.querySelector('.J-lemma-content') ||
+                      doc.querySelector('#J-lemma-main-wrapper');
+    if (!container) return extractContent(doc);
+
+    const clone = container.cloneNode(true);
+
+    // 移除编辑按钮、引用上标、目录等噪音
+    [
+      'script', 'style', 'sup',
+      '[class*="edit"]', '[class*="Edit"]',
+      '[class*="catalog"]', '[class*="Catalog"]',
+      '[class*="reference"]',
+    ].forEach(sel => clone.querySelectorAll(sel).forEach(n => n.remove()));
+
+    const out = document.createElement('div');
+    const imageUrls = [];
+
+    // 判断是否为"叶子块"：子节点全是内联元素（span/a/em 等），无 div/p 等块元素
+    const INLINE_TAGS = new Set(['span', 'a', 'em', 'strong', 'b', 'i', 'br', 'code', 'img']);
+
+    function visit(node) {
+      if (node.nodeType !== Node.ELEMENT_NODE) return;
+      const cls = typeof node.className === 'string' ? node.className : '';
+      const text = node.textContent.trim();
+
+      // 段落标题（class 里含 title 但不是大容器）
+      if (/title/i.test(cls) && !/(?:content|wrapper|box|main|lemma)/i.test(cls)) {
+        if (text.length > 0 && text.length < 120) {
+          const h = document.createElement('h3');
+          h.textContent = text;
+          out.appendChild(h);
+          return;
+        }
+      }
+
+      // 叶子块：子节点均为内联元素 → 直接作为段落
+      const hasBlockKids = [...node.children].some(c => !INLINE_TAGS.has(c.tagName.toLowerCase()));
+      if (!hasBlockKids) {
+        if (text.length > 15) {
+          // 收集图片
+          node.querySelectorAll('img').forEach(img => {
+            const raw = img.getAttribute('src') || '';
+            const src = raw.startsWith('http') ? raw :
+                        (raw ? (() => { try { return new URL(raw, baseUrl).href; } catch { return ''; } })() : '');
+            if (src) imageUrls.push(src);
+          });
+          const p = document.createElement('p');
+          p.innerHTML = node.innerHTML;
+          out.appendChild(p);
+        }
+        return;
+      }
+
+      // 有块级子节点 → 递归
+      for (const child of node.children) visit(child);
+    }
+
+    for (const child of clone.children) visit(child);
+
+    // 提取失败时降级到通用逻辑
+    if (out.textContent.trim().length < 50) return extractContent(doc);
+
+    const cloneForText = out.cloneNode(true);
+    cloneForText.querySelectorAll('br').forEach(br => br.replaceWith('\n'));
+
+    return {
+      htmlContent: out.innerHTML,
+      text: extractText(cloneForText),
+      imageUrls: [...new Set(imageUrls)],
+    };
+  }
+
+  /**
+   * 根据 URL 调度到对应提取器（站点专属或通用）
+   */
+  function extractForUrl(doc = document, url = window.location.href) {
+    try {
+      const { hostname } = new URL(url);
+      if (/wikipedia\.org$/.test(hostname)) return extractWikipedia(doc, url);
+      if (/baike\.baidu\.com$/.test(hostname)) return extractBaiduBaike(doc, url);
+    } catch {}
+    return extractContent(doc);
+  }
+
   /**
    * 检测文档中是否有"下一页"链接
    * 支持 <link rel="next">、<a rel="next">，以及含分页参数的"次へ"等文字链接
@@ -486,7 +634,7 @@
       doc.head.insertBefore(base, doc.head.firstChild);
     }
 
-    const extracted = extractContent(doc);
+    const extracted = extractForUrl(doc, url);
     const nextUrl = detectNextPageUrl(doc, url);
     return { ...extracted, nextUrl };
   }
@@ -497,7 +645,7 @@
    */
   async function collectAllPages() {
     const meta = extractMeta();
-    const page1 = extractContent();
+    const page1 = extractForUrl(document, window.location.href);
     const nextUrl1 = detectNextPageUrl(document, window.location.href);
 
     if (!nextUrl1) {
